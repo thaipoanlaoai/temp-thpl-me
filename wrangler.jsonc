@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Temp Clipboard — temp.thpl.me
+  // Worker ตัวนี้ผูกกับ route temp.thpl.me/* อยู่แล้วใน Cloudflare (อย่าตั้ง workers_dev ซ้ำ)
+  "name": "temp-clipboard",
+  "main": "./src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "temp.thpl.me/*", "zone_name": "thpl.me", "custom_domain": false }
+  ],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "kv_namespaces": [
+    { "binding": "KV", "id": "f76e0ad7e87d4842a84202c2abae45e0" }
+  ],
+  "observability": { "enabled": true }
+}

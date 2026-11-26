@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="th" data-theme="light" data-auth="unknown">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Temp Clipboard — บอร์ดชั่วคราวสำหรับข้อความ รูป และไฟล์</title>
+<meta name="description" content="ฝากข้อความ รูป และไฟล์ไว้ชั่วคราว แล้วคัดลอกหรือดาวน์โหลดไปใช้ต่อได้ทันที — ซิงก์ข้ามอุปกรณ์ด้วยบัญชีเดียว">
+<meta name="theme-color" content="#F6F6F3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101110" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/fonts.css">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<!-- ===== login gate ===== -->
+<section class="gate" id="gate" aria-labelledby="gate-title">
+  <div class="gate-card">
+    <span class="gate-mark" aria-hidden="true"></span>
+    <h1 id="gate-title" data-i18n="login.title">เข้าสู่ระบบ</h1>
+    <p class="gate-lede" data-i18n="login.lede">เข้าด้วยบัญชีเดียวกับทุกเครื่อง — โพสต์และรูปจะอยู่ที่เดียวกัน</p>
+    <form id="login-form" autocomplete="on" novalidate>
+      <label class="field-col">
+        <span data-i18n="login.email">อีเมล</span>
+        <input id="login-email" type="email" name="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </label>
+      <label class="field-col">
+        <span data-i18n="login.password">รหัสผ่าน</span>
+        <input id="login-password" type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <label class="remember">
+        <input type="checkbox" id="login-remember" checked>
+        <span data-i18n="login.remember">จำไว้ในเครื่องนี้ 30 วัน</span>
+      </label>
+      <p class="form-error" id="login-error" role="alert" hidden></p>
+      <button class="btn primary block" id="login-submit" type="submit" data-i18n="login.submit">เข้าสู่ระบบ</button>
+    </form>
+    <p class="gate-note" data-i18n="login.note">ข้อมูลเก็บบน Cloudflare KV ของคุณเอง — ใช้ได้ทุกอุปกรณ์ที่ล็อกอิน</p>
+    <div class="gate-langs" role="group" data-i18n-aria="a11y.langGroup">
+      <button type="button" class="lang" data-lang="th">ไทย</button>
+      <button type="button" class="lang" data-lang="zh">中文</button>
+      <button type="button" class="lang" data-lang="en">EN</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== app ===== -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="wrap topbar-in">
+      <a class="brand" href="./">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">
+          <span class="brand-name">Temp Clipboard</span>
+          <span class="brand-sub">temp.thpl.me</span>
+        </span>
+      </a>
+      <div class="top-actions">
+        <div class="langs" role="group" data-i18n-aria="a11y.langGroup">
+          <button type="button" class="lang" data-lang="th">ไทย</button>
+          <button type="button" class="lang" data-lang="zh">中文</button>
+          <button type="button" class="lang" data-lang="en">EN</button>
+        </div>
+        <button type="button" id="theme-toggle" class="icon-btn" data-i18n-aria="a11y.theme">
+          <svg class="i-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7"/></svg>
+          <svg class="i-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M20.4 14.2A8.4 8.4 0 0 1 9.8 3.6a8.4 8.4 0 1 0 10.6 10.6Z"/></svg>
+        </button>
+        <div class="acct-wrap">
+          <button type="button" id="acct-btn" class="acct" aria-haspopup="menu" aria-expanded="false" aria-label="บัญชี">
+            <span class="acct-ava" id="acct-ava">T</span>
+          </button>
+          <div class="menu" id="acct-menu" role="menu" hidden>
+            <p class="menu-mail" id="acct-mail"></p>
+            <button type="button" id="acct-install" role="menuitem" data-i18n="install.menu" hidden>ติดตั้งเป็นแอป</button>
+            <button type="button" id="acct-pass" role="menuitem" data-i18n="acct.change">เปลี่ยนรหัสผ่าน</button>
+            <button type="button" id="acct-out" role="menuitem" data-i18n="acct.logout">ออกจากระบบ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="offline-bar" id="offline-bar" hidden>
+    <span class="offline-dot" aria-hidden="true"></span>
+    <span id="offline-text" data-i18n="offline.text">ออฟไลน์อยู่ — แสดงข้อมูลล่าสุดที่บันทึกไว้</span>
+    <span id="pending-count" class="pending"></span>
+  </div>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1 data-i18n="app.h1">แปะไว้ตรงนี้ — คัดลอกไปใช้ที่ไหนก็ได้</h1>
+      <p class="lede" data-i18n="app.lede">พิมพ์ข้อความ แนบรูปหรือไฟล์ กด “โพสต์” แล้วกดคัดลอก/ดาวน์โหลดไปใช้ต่อได้ทันที · ซิงก์ทุกอุปกรณ์ที่ล็อกอินบัญชีเดียวกัน</p>
+    </section>
+
+    <section class="composer" id="composer" data-i18n-aria="a11y.composer">
+      <textarea id="draft" rows="2" data-i18n-ph="composer.placeholder" spellcheck="false" placeholder="พิมพ์ข้อความ หรือวาง/ลากรูปหรือไฟล์มาที่นี่ (Ctrl+V)…"></textarea>
+      <div id="attach-strip" class="attach" data-i18n-aria="a11y.attachStrip" hidden></div>
+      <div class="composer-tags">
+        <span class="tag-label" data-i18n="composer.tagsLabel">แท็ก</span>
+        <input id="tag-input" type="text" list="tag-suggest" autocomplete="off" spellcheck="false"
+               placeholder="ราคา, shopee, ตอบลูกค้า (คั่นด้วย ,)" data-i18n-ph="composer.tagsPh">
+        <datalist id="tag-suggest"></datalist>
+      </div>
+      <div class="composer-foot">
+        <div class="composer-btns">
+          <button type="button" id="btn-attach" class="btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.2" y="3.2" width="17.6" height="17.6" rx="3.6"/><circle cx="9" cy="9.4" r="1.7"/><path d="M20.8 15.2 16 10.8 6.4 20.8"/></svg>
+            <span data-i18n="composer.attach">แนบไฟล์</span>
+          </button>
+          <input id="file-input" type="file" multiple hidden>
+          <button type="button" id="btn-clear-draft" class="btn ghost" data-i18n="composer.clear">ล้างช่อง</button>
+        </div>
+        <div class="composer-main">
+          <span class="hint" data-i18n="composer.hint">วาง Ctrl+V · ลากมาวาง · เลือกไฟล์ · สูงสุด 4 รูป + 4 ไฟล์ (ไฟล์ไม่เกิน 20 MB)</span>
+          <button type="button" id="btn-post" class="btn primary" data-i18n="composer.post" disabled>โพสต์</button>
+        </div>
+      </div>
+      <p id="temp-note" class="temp-note" hidden data-i18n="composer.sessionNote">โหมดชั่วคราวเปิดอยู่ — โพสต์จะอยู่แค่ในแท็บนี้ ไม่ขึ้นคลาวด์</p>
+    </section>
+
+    <section class="search-row">
+      <div class="search">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.6"/><path d="m16 16 4.4 4.4"/></svg>
+        <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="ค้นหาโพสต์ แท็ก หรือลิงก์…" data-i18n-ph="search.placeholder" aria-label="ค้นหา">
+        <button type="button" id="search-clear" class="search-clear" hidden aria-label="ล้างคำค้น">✕</button>
+      </div>
+    </section>
+
+    <div class="filters" id="tag-bar" role="group" aria-label="ตัวกรอง"></div>
+
+    <section class="feed-head">
+      <div class="feed-head-top">
+        <h2 data-i18n="posts.title">โพสต์ล่าสุด</h2>
+        <div class="feed-head-actions">
+          <button type="button" id="btn-stats" class="link-btn" data-i18n="stats.open">สถิติพื้นที่</button>
+          <button type="button" id="btn-clear-all" class="clear-all" data-i18n="posts.clearAll">ล้างทั้งหมด</button>
+        </div>
+      </div>
+      <div class="feed-head-meta">
+        <span id="stats" class="stats" aria-live="polite"></span>
+        <span id="sync" class="sync" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <div class="notice" id="import-bar" hidden>
+      <p class="notice-text" id="import-text"></p>
+      <div class="notice-act">
+        <button type="button" class="btn sm" id="import-yes" data-i18n="import.yes">นำเข้าทั้งหมด</button>
+        <button type="button" class="btn sm ghost" id="import-no" data-i18n="import.no">ข้ามไป</button>
+      </div>
+    </div>
+
+    <section id="feed" class="feed" aria-live="polite"></section>
+
+    <div id="empty" class="empty" hidden>
+      <svg class="empty-mark" width="44" height="44" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="4" aria-hidden="true"><rect x="24" y="22" width="52" height="60" rx="13"/><rect x="38" y="13" width="24" height="17" rx="8"/><path d="M36 50 H64" stroke-linecap="round"/><path d="M36 64 H54" stroke-linecap="round"/></svg>
+      <p class="empty-title" id="empty-title" data-i18n="empty.title">ยังไม่มีโพสต์</p>
+      <p class="empty-hint" id="empty-hint" data-i18n="empty.hint">เริ่มจากพิมพ์ข้อความหรือแนบรูปด้านบน แล้วกด “โพสต์” ได้เลย</p>
+    </div>
+  </main>
+
+  <footer class="wrap foot">
+    <div class="foot-row">
+      <label class="field">
+        <span data-i18n="settings.expire">ลบอัตโนมัติ</span>
+        <select id="expire-select">
+          <option value="0" data-i18n="settings.expireOff">ปิด</option>
+          <option value="1" data-i18n="settings.expire1">1 วัน</option>
+          <option value="7" data-i18n="settings.expire7">7 วัน</option>
+          <option value="30" data-i18n="settings.expire30">30 วัน</option>
+        </select>
+      </label>
+      <label class="field check">
+        <input type="checkbox" id="session-mode">
+        <span data-i18n="settings.session">โหมดชั่วคราว (ไม่ขึ้นคลาวด์)</span>
+      </label>
+    </div>
+    <p class="foot-note" data-i18n="footer.note">โพสต์และรูปเก็บบน Cloudflare KV ใต้บัญชีของคุณ — เปิดจากเครื่องไหนที่ล็อกอินก็เห็นเหมือนกัน</p>
+  </footer>
+</div>
+
+<!-- ===== change password dialog ===== -->
+<dialog class="dlg" id="pw-dialog" aria-labelledby="pw-title">
+  <form id="pw-form" method="dialog">
+    <h2 id="pw-title" data-i18n="pw.title">เปลี่ยนรหัสผ่าน</h2>
+    <label class="field-col">
+      <span data-i18n="pw.current">รหัสผ่านปัจจุบัน</span>
+      <input id="pw-current" type="password" autocomplete="current-password" required>
+    </label>
+    <label class="field-col">
+      <span data-i18n="pw.next">รหัสผ่านใหม่</span>
+      <input id="pw-next" type="password" autocomplete="new-password" required>
+    </label>
+    <label class="field-col">
+      <span data-i18n="pw.confirm">ยืนยันรหัสผ่านใหม่</span>
+      <input id="pw-confirm" type="password" autocomplete="new-password" required>
+    </label>
+    <p class="form-error" id="pw-error" role="alert" hidden></p>
+    <div class="dlg-act">
+      <button type="button" class="btn ghost" id="pw-cancel" data-i18n="pw.cancel">ยกเลิก</button>
+      <button type="submit" class="btn primary" id="pw-save" data-i18n="pw.save">บันทึก</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ===== stats dialog ===== -->
+<dialog class="dlg dlg-wide" id="stats-dialog" aria-labelledby="stats-title">
+  <div class="stats-body">
+    <h2 id="stats-title" data-i18n="stats.title">สถิติพื้นที่</h2>
+    <div class="stat-grid" id="stat-grid"></div>
+    <h3 data-i18n="stats.byMonth">รายเดือน (12 เดือนล่าสุด)</h3>
+    <div class="month-bars" id="month-bars"></div>
+    <h3 data-i18n="stats.byTag">แท็กที่ใช้บ่อย</h3>
+    <div class="tag-stats" id="tag-stats"></div>
+    <div class="quota">
+      <div class="quota-label"><span data-i18n="stats.quota">พื้นที่ KV (แพลนฟรี 1 GB)</span><span id="quota-pct">—</span></div>
+      <div class="quota-bar"><i id="quota-fill"></i></div>
+    </div>
+    <p class="stats-note" data-i18n="stats.note">นับจากโพสต์ที่ยังไม่หมดอายุ · รูปนับตามขนาดไฟล์จริงหลังบีบอัด</p>
+    <div class="dlg-act"><button type="button" class="btn" id="stats-close" data-i18n="stats.close">ปิด</button></div>
+  </div>
+</dialog>
+
+<!-- ===== install help dialog ===== -->
+<dialog class="dlg" id="install-dialog" aria-labelledby="install-title">
+  <div class="install-body">
+    <h2 id="install-title" data-i18n="install.title">ติดตั้งเป็นแอป</h2>
+    <p id="install-text" class="install-text"></p>
+    <div class="dlg-act"><button type="button" class="btn" id="install-close" data-i18n="stats.close">ปิด</button></div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="assets/i18n.js" defer></script>
+<script src="assets/app.js" defer></script>
+</body>
+</html>
